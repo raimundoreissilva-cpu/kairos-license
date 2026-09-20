@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Kairos — Licenças</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #0e0e12; color: #f0f0f3; margin: 0; padding: 32px; }
+  h1 { color: #00d3c4; }
+  .card { background: #17171c; border: 1px solid #26262e; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #26262e; font-size: 14px; }
+  th { color: #8a8a94; font-weight: 600; }
+  .key { font-family: monospace; font-size: 13px; }
+  .badge { padding: 3px 8px; border-radius: 5px; font-size: 12px; font-weight: 600; }
+  .badge.active { background: #0c3a35; color: #00d3c4; }
+  .badge.revoked { background: #3a1414; color: #e0555a; }
+  .badge.seat-on { background: #0c3a35; color: #00d3c4; }
+  .badge.seat-off { background: #2a2a30; color: #8a8a94; }
+  input, select { background: #0e0e12; color: #f0f0f3; border: 1px solid #26262e; border-radius: 6px; padding: 8px; margin: 4px 4px 4px 0; }
+  button { background: #00d3c4; color: #06201d; border: none; border-radius: 6px; padding: 7px 14px; font-weight: 600; cursor: pointer; }
+  button.danger { background: #e0555a; color: #fff; }
+  button.secondary { background: transparent; color: #8a8a94; border: 1px solid #26262e; }
+  .row-actions { display: flex; gap: 6px; }
+  .sub-table { margin-top: 8px; margin-left: 20px; }
+  form.inline { display: inline; }
+</style>
+</head>
+<body>
+  <h1>Kairos — Painel de Licenças</h1>
+
+  <div class="card">
+    <h3>Gerar nova licença</h3>
+    <form method="post" action="/admin/licenses">
+      <input name="customer_name" placeholder="Nome do cliente" required>
+      <input name="customer_email" placeholder="E-mail do cliente" type="email">
+      <input name="max_activations" type="number" value="1" min="1" style="width: 80px;" title="Quantas máquinas podem ativar">
+      <input name="expires_at" type="date" title="Data de expiração (vazio = vitalícia)">
+      <input name="notes" placeholder="Observação (opcional)">
+      <input name="hardware_id" placeholder="ID da máquina (opcional)" title="Se preenchido, a chave só ativa NESTA máquina — deixe vazio para permitir a primeira que ativar" style="min-width: 260px;">
+      <button type="submit">Gerar chave</button>
+    </form>
+  </div>
+
+  {% for lic in licenses %}
+  <div class="card">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <span class="key">{{ lic.license_key }}</span>
+        <span class="badge {{ 'active' if lic.status == 'active' else 'revoked' }}">{{ lic.status }}</span>
+      </div>
+      <div class="row-actions">
+        {% if lic.status == 'active' %}
+        <form class="inline" method="post" action="/admin/licenses/{{ lic.id }}/revoke">
+          <button class="danger" type="submit">Revogar licença</button>
+        </form>
+        {% else %}
+        <form class="inline" method="post" action="/admin/licenses/{{ lic.id }}/reactivate">
+          <button type="submit">Reativar licença</button>
+        </form>
+        {% endif %}
+        <form class="inline" method="post" action="/admin/licenses/{{ lic.id }}/delete"
+              onsubmit="return confirm('Excluir esta licença de vez? Isso apaga também o histórico de ativações dela e NÃO tem volta. Se quiser só bloquear temporariamente, use Revogar em vez de Excluir.');">
+          <button class="secondary" type="submit">Excluir</button>
+        </form>
+      </div>
+    </div>
+    <p style="color:#8a8a94; font-size:13px; margin: 8px 0 0;">
+      {{ lic.customer_name or "—" }} {% if lic.customer_email %}· {{ lic.customer_email }}{% endif %}
+      · limite: {{ lic.max_activations }} máquina(s)
+      · expira: {{ lic.expires_at.strftime('%d/%m/%Y') if lic.expires_at else "vitalícia" }}
+      {% if lic.notes %}· {{ lic.notes }}{% endif %}
+    </p>
+    {% if lic.bound_hardware_id %}
+    <p style="color:#8a8a94; font-size:13px; margin: 4px 0 0;">
+      🔒 amarrada de fábrica ao hardware ID: <span class="key">{{ lic.bound_hardware_id }}</span>
+    </p>
+    {% endif %}
+
+    {% if lic.activations %}
+    <table class="sub-table">
+      <tr><th>Hardware ID</th><th>Ativada em</th><th>Última vez vista</th><th>Status</th><th></th></tr>
+      {% for act in lic.activations %}
+      <tr>
+        <td class="key">{{ act.hardware_id }}</td>
+        <td>{{ act.activated_at.strftime('%d/%m/%Y %H:%M') }}</td>
+        <td>{{ act.last_seen_at.strftime('%d/%m/%Y %H:%M') }}</td>
+        <td>
+          {% if act.deactivated_at %}
+            <span class="badge seat-off">desativada</span>
+          {% else %}
+            <span class="badge seat-on">em uso</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if not act.deactivated_at %}
+          <form method="post" action="/admin/activations/{{ act.id }}/deactivate">
+            <button class="secondary" type="submit">Liberar vaga</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p style="color:#8a8a94; font-size:13px;">Ainda não ativada em nenhuma máquina.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+</body>
+</html>
