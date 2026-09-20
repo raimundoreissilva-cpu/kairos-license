@@ -52,6 +52,37 @@ def _get_license_by_key(cur, license_key: str) -> dict | None:
     return cur.fetchone()
 
 
+def create_pending_license_from_signup(
+    customer_name: str, customer_email: str, hardware_id: str
+) -> dict:
+    """Chamada pelo app desktop (license_client.register_license) assim que
+    alguém cria uma conta por lá — não pelo painel admin. Só REGISTRA a
+    licença com os dados do cadastro (nome/e-mail já preenchidos, chave já
+    gerada), sem ativar nem amarrar a nenhuma máquina: quem decide liberar
+    de fato (revisar, mandar a chave pro cliente, ativar) continua sendo
+    você, manualmente, pelo /admin — isso só elimina o trabalho de digitar
+    nome/e-mail toda vez que alguém se cadastra.
+
+    Idempotente por e-mail: se essa pessoa já se cadastrou antes (ex: reabriu
+    o cadastro, ou reinstalou o app antes de completar a compra), devolve a
+    licença já existente em vez de criar uma segunda pra ela."""
+    with get_cursor() as cur:
+        cur.execute(
+            "SELECT * FROM licenses WHERE customer_email = %s ORDER BY created_at ASC LIMIT 1",
+            (customer_email,),
+        )
+        existing = cur.fetchone()
+        if existing:
+            return dict(existing)
+
+    return create_license(
+        customer_name=customer_name,
+        customer_email=customer_email,
+        max_activations=1,
+        notes=f"Criada automaticamente pelo cadastro no app (hardware_id: {hardware_id}).",
+    )
+
+
 def activate(license_key: str, hardware_id: str) -> tuple[bool, str, dict | None]:
     """Ativa `hardware_id` numa licença. Idempotente: reativar a mesma
     máquina não gasta cota nova. Retorna (sucesso, mensagem, dados)."""

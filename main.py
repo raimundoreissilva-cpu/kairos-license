@@ -20,7 +20,7 @@ import re
 import secrets as pysecrets
 
 import bcrypt
-from fastapi import FastAPI, Request, Depends, HTTPException, Form
+from fastapi import FastAPI, Request, Depends, HTTPException, Form, Header
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
@@ -88,6 +88,17 @@ def debug_check_password(body: _DebugPasswordCheck):
 # Autenticação do painel admin — usuário/senha vêm do .env, nunca hardcoded.
 # Gere o hash com: python -c "import bcrypt; print(bcrypt.hashpw(b'suasenha', bcrypt.gensalt()).decode())"
 # ---------------------------------------------------------------------------
+def _check_app_secret(x_app_secret: str = Header(default="")) -> None:
+    """Autentica chamadas do PRÓPRIO app desktop (não do painel admin) — ex:
+    o cadastro automático de licença. É um segredo simples (não é senha de
+    usuário nenhum), só pra essa rota não ficar aberta pra qualquer um criar
+    licenças em massa. O mesmo valor precisa estar no config.toml do app
+    (chave APP_SHARED_SECRET), embutido no instalador."""
+    expected = os.environ.get("APP_SHARED_SECRET", "")
+    if not expected or not pysecrets.compare_digest(x_app_secret, expected):
+        raise HTTPException(status_code=401, detail="Segredo do app inválido ou ausente.")
+
+
 def _check_admin(credentials: HTTPBasicCredentials = Depends(security)) -> None:
     admin_user = os.environ.get("ADMIN_USER", "")
     admin_hash = os.environ.get("ADMIN_PASSWORD_HASH", "")
@@ -125,6 +136,26 @@ def api_activate(body: ActivateRequest):
 @app.post("/api/validate")
 def api_validate(body: ValidateRequest):
     return licensing.validate(body.license_key.strip(), body.hardware_id.strip())
+
+
+class RegisterLicenseRequest(BaseModel):
+    username: str
+    email: str
+    hardware_id: str
+
+
+@app.post("/api/register-license")
+def api_register_license(body: RegisterLicenseRequest, _=Depends(_check_app_secret)):
+    """Chamada pelo app desktop assim que uma conta é criada (ver
+    license_client.register_license) — não é chamada pelo usuário final
+    diretamente, nem exige o serial. Só registra a licença no painel,
+    pronta pra você ativar/entregar manualmente."""
+    lic = licensing.create_pending_license_from_signup(
+        customer_name=body.username.strip(),
+        customer_email=body.email.strip(),
+        hardware_id=body.hardware_id.strip(),
+    )
+    return {"ok": True, "license_key": lic["license_key"]}
 
 
 @app.post("/api/deactivate")
