@@ -191,6 +191,31 @@ def reactivate_license(license_id: int) -> None:
         cur.execute("UPDATE licenses SET status = 'active' WHERE id = %s", (license_id,))
 
 
+def update_license(
+    license_id: int,
+    customer_name: str,
+    customer_email: str,
+    max_activations: int,
+    expires_at: str | None,
+    notes: str,
+) -> None:
+    """Edita os campos comerciais/informativos de uma licença já existente
+    (botão "Editar" no painel admin) — nome, e-mail, limite de máquinas,
+    validade e observação. NÃO toca em license_key, status nem nas
+    ativações — é só correção de dados (ex: e-mail digitado errado no
+    cadastro automático), não revogação nem exclusão."""
+    with get_cursor() as cur:
+        cur.execute(
+            """
+            UPDATE licenses
+            SET customer_name = %s, customer_email = %s, max_activations = %s,
+                expires_at = %s, notes = %s
+            WHERE id = %s
+            """,
+            (customer_name, customer_email, max_activations, expires_at, notes, license_id),
+        )
+
+
 def delete_license(license_id: int) -> None:
     """Apaga a licença DE VEZ (diferente de revoke_license, que so muda o
     status e mantem o historico). O "ON DELETE CASCADE" da tabela

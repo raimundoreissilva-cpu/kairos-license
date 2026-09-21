@@ -230,6 +230,30 @@ def admin_reactivate(license_id: int, _=Depends(_check_admin)):
     return RedirectResponse(url="/admin", status_code=303)
 
 
+@app.post("/admin/licenses/{license_id}/edit")
+def admin_edit_license(
+    license_id: int,
+    customer_name: str = Form(""),
+    customer_email: str = Form(""),
+    max_activations: int = Form(1),
+    expires_at: str = Form(""),  # yyyy-mm-dd ou vazio
+    notes: str = Form(""),
+    _=Depends(_check_admin),
+):
+    """Corrige nome/e-mail/limite/validade/observação de uma licença já
+    criada (ex: e-mail digitado errado no cadastro automático) — não
+    revoga, não exclui, não toca em ativações."""
+    licensing.update_license(
+        license_id,
+        customer_name=customer_name,
+        customer_email=customer_email,
+        max_activations=max_activations,
+        expires_at=(expires_at or None),
+        notes=notes,
+    )
+    return RedirectResponse(url="/admin", status_code=303)
+
+
 @app.post("/admin/licenses/{license_id}/delete")
 def admin_delete(license_id: int, _=Depends(_check_admin)):
     """Diferente de /revoke: apaga a licenca e o historico de ativacoes
