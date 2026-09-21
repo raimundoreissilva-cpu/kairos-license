@@ -70,6 +70,18 @@
       · expira: {{ lic.expires_at.strftime('%d/%m/%Y') if lic.expires_at else "vitalícia" }}
       {% if lic.notes %}· {{ lic.notes }}{% endif %}
     </p>
+    <details style="margin-top: 6px;">
+      <summary style="cursor:pointer; color:#8a8a94; font-size:13px;">Editar dados</summary>
+      <form method="post" action="/admin/licenses/{{ lic.id }}/edit"
+            style="margin-top:8px; display:flex; flex-wrap:wrap; gap:4px;">
+        <input name="customer_name" value="{{ lic.customer_name or '' }}" placeholder="Nome do cliente">
+        <input name="customer_email" value="{{ lic.customer_email or '' }}" placeholder="E-mail do cliente" type="email">
+        <input name="max_activations" type="number" value="{{ lic.max_activations }}" min="1" style="width: 80px;">
+        <input name="expires_at" type="date" value="{{ lic.expires_at.strftime('%Y-%m-%d') if lic.expires_at else '' }}">
+        <input name="notes" value="{{ lic.notes or '' }}" placeholder="Observação (opcional)" style="min-width:260px;">
+        <button type="submit">Salvar</button>
+      </form>
+    </details>
     {% if lic.bound_hardware_id %}
     <p style="color:#8a8a94; font-size:13px; margin: 4px 0 0;">
       🔒 amarrada de fábrica ao hardware ID: <span class="key">{{ lic.bound_hardware_id }}</span>
