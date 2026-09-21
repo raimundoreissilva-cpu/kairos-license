@@ -34,6 +34,19 @@ templates = Jinja2Templates(directory="templates")
 security = HTTPBasic()
 
 
+@app.get("/ping")
+def ping():
+    """Endpoint leve, sem tocar no banco — só confirma que o processo está
+    de pé. Dois usos possíveis, não excludentes: (1) o app desktop chama
+    isso em paralelo, bem no início do login/cadastro (ver
+    license_client.ping_server), pra dar um head start acordando o
+    servidor antes da checagem de licença de verdade; (2) opcionalmente,
+    um monitor externo (UptimeRobot, cron-job.org) batendo aqui a cada
+    ~10 min mantém o servidor sempre acordado, sem depender do usuário
+    estar logando."""
+    return {"status": "ok"}
+
+
 @app.on_event("startup")
 def _startup():
     db.init_schema()
