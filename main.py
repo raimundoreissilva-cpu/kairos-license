@@ -34,6 +34,21 @@ templates = Jinja2Templates(directory="templates")
 security = HTTPBasic()
 
 
+@app.get("/download")
+def download_redirect():
+    """Redireciona pro link real do instalador (GitHub Releases, Drive, ou
+    onde estiver hospedado de fato) — o link que você entrega pro cliente
+    é sempre <esta-url>/download, sem expor onde o arquivo está guardado.
+
+    Pra lançar uma versão nova, só troca a variável de ambiente
+    DOWNLOAD_URL no painel do Render pro link do novo release — não
+    precisa mudar código nem redeploy."""
+    url = os.environ.get("DOWNLOAD_URL")
+    if not url:
+        raise HTTPException(status_code=503, detail="Link de download ainda não configurado.")
+    return RedirectResponse(url=url, status_code=307)
+
+
 @app.get("/ping")
 def ping():
     """Endpoint leve, sem tocar no banco — só confirma que o processo está
